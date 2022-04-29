@@ -53,6 +53,8 @@ docker-compose down -v
 
 
 
+Medium Post : https://medium.com/@stefentaime/etl-data-pipeline-rdbms-to-hdfs-using-airflow-apache-sqoop-spark-postgres-and-hive-773f0e745537
+
 
 
 Original github https://github.com/Pathairush/rdbms_to_hdfs_data_pipeline
