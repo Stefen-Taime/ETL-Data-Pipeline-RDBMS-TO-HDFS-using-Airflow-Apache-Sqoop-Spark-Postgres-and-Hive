@@ -1,0 +1,144 @@
+version: '3.7'
+services:
+    postgres:
+        image: postgres:9.6
+        container_name: postgres-airflow
+        environment:
+            - POSTGRES_USER=airflow
+            - POSTGRES_PASSWORD=airflow
+            - POSTGRES_DB=airflow
+        logging:
+            options:
+                max-size: 10m
+                max-file: "3"
+    webserver:
+        container_name: airflow
+        image: ppatcoding/modified_puckel_airflow:latest
+        restart: always
+        privileged: true
+        depends_on:
+            - postgres
+        environment:
+            - LOAD_EX=n
+            - EXECUTOR=Local
+            - AIRFLOW_CONN_POSTGRES_DB=postgres://postgres:passw0rd@database:5432/temp_db
+            - AIRFLOW_CONN_SPARK=spark://spark-master:7077
+        logging:
+            options:
+                max-size: 10m
+                max-file: "3"
+        volumes:
+            - ${PWD}/airflow/dags:/usr/local/airflow/dags
+            - ${PWD}/airflow/plugins:/usr/local/airflow/plugins
+            - ${PWD}/airflow/scripts:/usr/local/airflow/scripts
+            - /var/run/docker.sock:/var/run/docker.sock
+        ports:
+            - "8080:8080"
+        command: webserver
+        healthcheck:
+            test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
+            interval: 30s
+            timeout: 30s
+            retries: 3
+    database:
+          image: postgres:9.6
+          container_name: postgres-db
+          environment:
+            - POSTGRES_DB=temp_db
+            - POSTGRES_PASSWORD=passw0rd
+            - PGDATA=/var/lib/postgresql/data/pgdata
+          volumes:
+            - ${PWD}/data:/var/lib/postgresql/data/lmwn
+          logging:
+              options:
+                max-size: 10m
+                max-file: "3"
+    namenode:
+        image: bde2020/hadoop-namenode:2.0.0-hadoop2.7.4-java8
+        container_name: hive-namenode
+        volumes:
+            - namenode:/hadoop/dfs/name
+        environment:
+            - CLUSTER_NAME=test
+        env_file:
+            - ${PWD}/hadoop-hive.env
+        ports:
+            - "50070:50070"
+    datanode:
+        image: bde2020/hadoop-datanode:2.0.0-hadoop2.7.4-java8
+        volumes:
+            - datanode:/hadoop/dfs/data
+        env_file:
+            - ./hadoop-hive.env
+        environment:
+            SERVICE_PRECONDITION: "namenode:50070"
+        ports:
+            - "50075:50075"
+    hive-metastore-postgresql:
+        image: bde2020/hive-metastore-postgresql:2.3.0
+    hive-metastore:
+        image: bde2020/hive:2.3.2-postgresql-metastore
+        env_file:
+            - ./hadoop-hive.env
+        command: /opt/hive/bin/hive --service metastore
+        environment:
+            SERVICE_PRECONDITION: "namenode:50070 datanode:50075 hive-metastore-postgresql:5432"
+        ports:
+            - "9083:9083"
+    hive-server:
+        image: bde2020/hive:2.3.2-postgresql-metastore
+        container_name: hive-server
+        env_file:
+            - ./hadoop-hive.env
+        environment:
+            HIVE_CORE_CONF_javax_jdo_option_ConnectionURL: "jdbc:postgresql://hive-metastore/metastore"
+            SERVICE_PRECONDITION: "hive-metastore:9083"
+        ports:
+            - "10000:10000"
+            - "10002:10002"
+        volumes:
+            - ${PWD}/airflow/others/sqoop:/opt/sqoop
+            - ${PWD}/airflow/scripts/hql:/opt/hql
+    spark-master:
+        image: bde2020/spark-master:3.1.1-hadoop3.2
+        container_name: spark-master
+        ports:
+            - "8079:8080"
+            - "7077:7077"
+        environment:
+            - INIT_DAEMON_STEP=setup_spark
+        volumes:
+            - ${PWD}/airflow/scripts/spark:/home/script
+            - ${PWD}/sql_result:/home/sql_result
+    spark-worker-1:
+        image: bde2020/spark-worker:3.1.1-hadoop3.2
+        container_name: spark-worker-1
+        depends_on:
+            - spark-master
+        ports:
+            - "8081:8081"
+        environment:
+            - "SPARK_MASTER=spark://spark-master:7077"
+    spark-worker-2:
+        image: bde2020/spark-worker:3.1.1-hadoop3.2
+        container_name: spark-worker-2
+        depends_on:
+            - spark-master
+        ports:
+            - "8082:8081"
+        environment:
+            - "SPARK_MASTER=spark://spark-master:7077"
+            
+            
+    adminer:
+        image: adminer:latest
+        ports:
+            - 5000:8080/tcp
+        deploy:
+          restart_policy:
+            condition: on-failure         
+            
+            
+volumes:
+    namenode:
+    datanode:
