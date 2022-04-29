@@ -1,4 +1,4 @@
-![img](./image/rdbms_to_hdfs.png)
+![img](./image/Kafka.jpeg)
 
 ```
 docker-compose up -d
