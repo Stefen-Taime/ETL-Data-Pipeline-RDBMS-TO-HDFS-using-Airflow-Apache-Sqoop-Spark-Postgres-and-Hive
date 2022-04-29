@@ -51,4 +51,8 @@ docker-compose down -v
 
 
 
+
+
+
+
 Original github https://github.com/Pathairush/rdbms_to_hdfs_data_pipeline
